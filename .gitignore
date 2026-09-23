@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+data/
+uploads/
+*.log
+/homework/
+/.local/
+/.agents/
+web/node_modules/
+static/dist/
+.DS_Store

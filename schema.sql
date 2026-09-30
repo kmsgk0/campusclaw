@@ -21,3 +21,18 @@ CREATE INDEX IF NOT EXISTS material_class ON materials(class_id,id);
 CREATE TABLE IF NOT EXISTS assignments (id INTEGER PRIMARY KEY, class_id INTEGER REFERENCES classes(id), title TEXT);
 CREATE TABLE IF NOT EXISTS assistants (id INTEGER PRIMARY KEY, class_id INTEGER REFERENCES classes(id), name TEXT);
 CREATE TABLE IF NOT EXISTS skills (id INTEGER PRIMARY KEY, name TEXT UNIQUE, enabled INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE IF NOT EXISTS material_indexes (
+ material_id INTEGER PRIMARY KEY REFERENCES materials(id), signature TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('pending','ready','failed')), error TEXT
+);
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER NOT NULL REFERENCES materials(id),
+ chunk_index INTEGER NOT NULL, start_offset INTEGER NOT NULL, end_offset INTEGER NOT NULL,
+ body_text TEXT NOT NULL, UNIQUE(material_id,chunk_index)
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(tokens);
+CREATE TABLE IF NOT EXISTS embedding_cache (
+ class_id INTEGER NOT NULL REFERENCES classes(id), fingerprint TEXT NOT NULL, vector_json TEXT NOT NULL,
+ PRIMARY KEY(class_id,fingerprint)
+);

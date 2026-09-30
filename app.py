@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import jwt
+import knowledge
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request, send_file
 from markdown_it import MarkdownIt
@@ -36,6 +37,14 @@ def create_app(config=None):
         SEED_PASSWORD=os.getenv("SEED_PASSWORD"),
         JWT_SECRET=os.getenv("JWT_SECRET"),
         MAX_CONTENT_LENGTH=MAX_FILE_BYTES + 64 * 1024,
+        EMBEDDING_BASE_URL=os.getenv("EMBEDDING_BASE_URL", ""),
+        EMBEDDING_API_KEY=os.getenv("EMBEDDING_API_KEY", ""),
+        EMBEDDING_MODEL=os.getenv("EMBEDDING_MODEL", ""),
+        EMBEDDING_DIM=int(os.getenv("EMBEDDING_DIM", "2048")),
+        CHAT_BASE_URL=os.getenv("CHAT_BASE_URL", ""),
+        CHAT_API_KEY=os.getenv("CHAT_API_KEY", ""),
+        CHAT_MODEL=os.getenv("CHAT_MODEL", ""),
+        QDRANT_URL=os.getenv("QDRANT_URL", "http://qdrant:6333"),
     )
     if config:
         app.config.update(config)
@@ -194,8 +203,8 @@ def create_app(config=None):
     def materials():
         query = request.args.get("q", "").strip()
         rows = db().execute(
-            "SELECT m.id,m.title,m.original_name,m.size_bytes,m.created_at,u.display_name author "
-            "FROM materials m JOIN users u ON m.uploaded_by=u.id JOIN knowledge_entries k ON k.material_id=m.id "
+            "SELECT m.id,m.title,m.original_name,m.size_bytes,m.created_at,u.display_name author,COALESCE(i.status,'pending') index_status,i.error index_error "
+            "FROM materials m JOIN users u ON m.uploaded_by=u.id JOIN knowledge_entries k ON k.material_id=m.id LEFT JOIN material_indexes i ON i.material_id=m.id "
             "WHERE m.class_id=? AND (?='' OR instr(lower(m.title),lower(?))>0 OR instr(lower(k.body_text),lower(?))>0) "
             "ORDER BY m.id DESC", (g.user["class_id"], query, query, query),
         ).fetchall()
@@ -260,6 +269,8 @@ def create_app(config=None):
             destination.unlink(missing_ok=True)
             app.logger.exception("Material ingestion failed")
             return jsonify(error="材料保存失败，请稍后重试"), 500
-        return jsonify(material_id=material_id, message="上传成功，正文已入库"), 201
+        index = search_service.index_material(db(), material_id)
+        return jsonify(material_id=material_id, message="材料已保存，索引已就绪" if index['index_status']=='ready' else "材料已保存，但索引未完成", **index), 201
 
+    search_service = knowledge.register(app, db, login_required, find_material)
     return app

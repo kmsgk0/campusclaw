@@ -8,6 +8,7 @@ dependencies = [
     "markdown-it-py>=4.2.0",
     "pyjwt>=2.10",
     "python-dotenv>=1.2.3",
+    "qdrant-client>=1.17,<2",
 ]
 
 [dependency-groups]

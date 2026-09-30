@@ -43,26 +43,31 @@ The system MUST derive class and role from authenticated server-side user data.
 - **THEN** the API returns 403 and both tables and the upload directory are unchanged
 
 ### Requirement: Material ingestion and download
-The system MUST accept teacher uploads of UTF-8 txt/md files no larger than 2 MiB and store material metadata and knowledge text atomically.
+The system MUST accept teacher uploads of UTF-8 txt/md files no larger than 2 MiB and store material metadata and knowledge text atomically, then build a retrievable index.
 
 #### Scenario: Upload and read
 - **WHEN** a teacher uploads a valid file
-- **THEN** one materials row and one linked knowledge_entries row are committed for the teacher's class
-- **AND** same-class students see it in the database-backed list, read the body and download identical bytes
+- **THEN** materials and knowledge_entries are committed for the teacher's class
+- **AND** successful indexing marks the material ready for retrieval
+- **AND** same-class users can read and download identical bytes
+
+#### Scenario: Index service failure
+- **WHEN** indexing fails after material storage
+- **THEN** the response explicitly reports that storage succeeded but indexing failed
+- **AND** the original material remains accessible and can be indexed again by its class teacher
 
 #### Scenario: Invalid upload
-- **WHEN** the extension is not txt/md, the file exceeds 2 MiB, or the text is empty, invalid UTF-8 or contains NUL
-- **THEN** the API returns 415, 413 or 400 respectively with a readable error
-- **AND** neither database rows nor files remain from the rejected upload
+- **WHEN** the extension, size, encoding or contents violate existing limits
+- **THEN** the existing 415, 413 or 400 response leaves neither material rows nor files
 
 #### Scenario: Database failure
-- **WHEN** database insertion fails during upload
-- **THEN** both table changes roll back, the new disk file is removed and an explicit 500 response is returned
+- **WHEN** database insertion fails during material storage
+- **THEN** both table changes roll back, the new file is removed and an explicit 500 response is returned
 
 #### Scenario: Authorized files only
-- **WHEN** someone requests a file without a valid session or from another class
-- **THEN** the download returns 401 or 404 respectively without file content
-- **AND** no public /uploads path exposes files
+- **WHEN** someone requests a file without a valid token or from another class
+- **THEN** the download returns 401 or 404 without file content
+- **AND** no public uploads path exposes files
 
 ### Requirement: Usable material interface
 The system MUST provide a login page and material workspace using server-confirmed identity and Bearer-authenticated API requests.

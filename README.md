@@ -27,6 +27,8 @@ docker compose exec app flask --app app:create_app index-materials
 
 ## 本地开发与检查
 
+以下命令使用宿主机上的 Node.js 和 uv。上面的 Compose 配置用于构建和运行应用，其运行镜像不包含测试目录与开发依赖。
+
 ```bash
 npm --prefix web ci
 npm --prefix web run build
@@ -47,7 +49,7 @@ uv run python -m pytest -q
 | `GET /api/materials/{id}` | 阅读本班材料 |
 | `GET /api/materials/{id}/file` | 下载本班原文件 |
 
-无有效登录返回 401，学生上传返回 403，跨班和不存在的材料统一返回 404。支持不超过 2 MiB 的 UTF-8 `.txt`、`.md`，不支持 PDF/Word。数据库保存文件元信息与正文，未接入大模型。
+无有效登录返回 401，学生上传返回 403，跨班和不存在的材料统一返回 404。支持不超过 2 MiB 的 UTF-8 `.txt`、`.md`，不支持 PDF/Word。数据库保存文件元信息与正文，检索与模型问答见下文。
 
 登录返回 `token`、`token_type: Bearer` 和 `expires_in`。前端将 token 保存在当前标签页的 `sessionStorage`，后续 API 和文件下载请求携带 `Authorization: Bearer <token>`。服务端校验 JWT 签名与八小时有效期，再从数据库确认角色和班级；退出登录会撤销 token。页面刷新保留当前标签页的登录状态，关闭标签页后需重新登录。
 

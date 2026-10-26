@@ -1,0 +1,336 @@
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #e2e8f1;
+  --muted: #a7b4c9;
+  --line: #303d50;
+  --surface: #111827;
+  --blue-soft: #263754;
+  --green: #79c7a1;
+  --panel: #182131;
+  --panel-subtle: #141d2c;
+  --selected: #263754;
+  --link: #a6c3ff;
+  color: var(--text);
+  background: var(--surface);
+}
+
+[data-theme="dark"] :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: var(--text);
+}
+
+[data-theme="dark"]
+  :is(
+    .sidebar,
+    .workspace-card,
+    .topbar,
+    .library-layout,
+    .file-pane,
+    .file-pane-header,
+    .material-search,
+    .file-icon,
+    .file-item.active,
+    .file-pane-footer,
+    .reader-toolbar,
+    .reading-footer,
+    .reader-status,
+    .assistant-aside,
+    .assistant-header,
+    .assistant-context,
+    .assistant-orbit,
+    .suggestions > button,
+    .composer,
+    .citation-card,
+    .question-bubble,
+    .section-icon,
+    .knowledge-search-form,
+    .search-illustration,
+    .search-illustration > span,
+    .search-example > button,
+    .search-result,
+    .result-bottom,
+    .full-assistant-frame,
+    .modal,
+    .modal-heading,
+    .modal-footer,
+    .upload-dropzone,
+    .upload-symbol,
+    .login-card,
+    .login-icon,
+    .mini-workspace,
+    .mini-sidebar,
+    .mini-list,
+    .mini-list > i,
+    .mini-paper > span,
+    .login-form input,
+    .badge,
+    .context-tag,
+    .button-outline,
+    .button-soft,
+    .sidebar-upload,
+    .nav-item.active,
+    .prose td,
+    .prose th,
+    .prose pre,
+    .prose hr
+  ) {
+  border-color: var(--line);
+}
+[data-theme="dark"]
+  :is(
+    .workspace-main,
+    .topbar,
+    .reader,
+    .assistant-aside,
+    .assistant,
+    .modal,
+    .login-card,
+    .mini-workspace,
+    .skip-link
+  ) {
+  background: var(--panel);
+}
+[data-theme="dark"]
+  :is(
+    .sidebar,
+    .workspace-card,
+    .assistant-context,
+    .search-page,
+    .ask-page,
+    .login-page,
+    .mini-sidebar,
+    .mini-list
+  ) {
+  background: var(--panel-subtle);
+}
+[data-theme="dark"]
+  :is(
+    .button-outline,
+    .material-search,
+    .knowledge-search-form,
+    .context-tag,
+    .composer,
+    .search-result,
+    .citation-card,
+    .search-example > button,
+    .upload-symbol,
+    .login-form input
+  ) {
+  background: var(--panel);
+  color: var(--text);
+}
+[data-theme="dark"]
+  :is(
+    .button-soft,
+    .button-outline:not(:disabled):hover,
+    .button-ghost:not(:disabled):hover,
+    .icon-button:hover,
+    .icon-button.selected,
+    .nav-item:hover,
+    .nav-item.active,
+    .file-item:hover,
+    .file-item.active,
+    .file-kind-tabs button[data-state="active"],
+    .mode-tabs button[data-state="active"],
+    .question-bubble,
+    .suggestions > button,
+    .citation-card:hover,
+    .search-example > button:hover,
+    .upload-dropzone:hover
+  ) {
+  background: var(--selected);
+  color: var(--link);
+}
+[data-theme="dark"]
+  :is(
+    .badge,
+    .upload-dropzone,
+    .search-illustration,
+    .suggestions > button,
+    .prose blockquote,
+    .prose pre,
+    .prose code,
+    .prose th
+  ) {
+  background: var(--panel-subtle);
+}
+[data-theme="dark"]
+  :is(
+    .brand,
+    .breadcrumbs strong,
+    .file-item-copy > strong,
+    .paper-body h2,
+    .prose h3:first-child,
+    .prose h3,
+    .prose h4,
+    .prose h5,
+    .prose h6,
+    .assistant-header strong,
+    .assistant-empty h2,
+    .section-heading h1,
+    .search-welcome h2,
+    .modal-heading h2,
+    .login-copy h1,
+    .login-card h2
+  ) {
+  color: var(--text);
+}
+[data-theme="dark"]
+  :is(
+    .nav-item,
+    .sidebar-upload,
+    .icon-button,
+    .badge,
+    .button-ghost,
+    .file-kind-tabs button,
+    .mode-tabs button,
+    .reader-toolbar,
+    .paper-body,
+    .prose blockquote,
+    .prose code,
+    .answer-text,
+    .question-bubble,
+    .composer textarea,
+    .knowledge-search-form input,
+    .material-search input,
+    .result-top > button,
+    .search-result > p,
+    .source-original,
+    .source-meta,
+    .upload-dropzone strong,
+    .login-features > div,
+    .mini-list > b,
+    .mini-paper > b
+  ) {
+  color: var(--text);
+}
+[data-theme="dark"]
+  :is(
+    .button-soft,
+    .nav-item.active,
+    .file-kind-tabs button[data-state="active"],
+    .mode-tabs button[data-state="active"],
+    .assistant-context strong,
+    .reply-label,
+    .reading-footer .button,
+    .result-bottom .button,
+    .prose a,
+    .inline-citation,
+    .citation-number,
+    .search-summary > span:first-child
+  ) {
+  color: var(--link);
+}
+[data-theme="dark"]
+  :is(
+    .file-icon,
+    .assistant-symbol,
+    .reply-avatar,
+    .inline-citation,
+    .citation-number,
+    .section-icon,
+    .search-illustration > span,
+    .login-icon,
+    .mini-paper > span
+  ) {
+  background: var(--selected);
+  color: var(--link);
+}
+[data-theme="dark"] .file-txt {
+  background: #203b33;
+  color: #a5d8bd;
+}
+[data-theme="dark"] .class-avatar {
+  background: var(--selected);
+  color: var(--link);
+}
+[data-theme="dark"] .user-avatar.teacher {
+  background: var(--selected);
+  color: var(--link);
+}
+[data-theme="dark"] .user-avatar.student {
+  background: #203b33;
+  color: #a5d8bd;
+}
+[data-theme="dark"] .assistant-orbit {
+  background: linear-gradient(145deg, #263754, #1d2b44);
+  color: var(--link);
+}
+[data-theme="dark"] .composer-wrap {
+  background: var(--panel);
+}
+[data-theme="dark"] .composer .button-icon:disabled {
+  background: var(--selected);
+  color: var(--muted);
+}
+[data-theme="dark"] .index-pending {
+  color: #e8bf86;
+}
+[data-theme="dark"] .notice {
+  background: #1b382d;
+  color: #a0dbb8;
+}
+[data-theme="dark"] .notice .icon-button {
+  color: #a0dbb8;
+}
+[data-theme="dark"] :is(.inline-error, .pane-error) {
+  color: #f4a7ad;
+}
+[data-theme="dark"] .source-original mark {
+  background: #49512b;
+  color: #eff3cb;
+}
+[data-theme="dark"] .modal-overlay {
+  background: #0009;
+}
+[data-theme="dark"] .paper-end > span {
+  background: var(--line);
+}
+[data-theme="dark"] :is(.mini-list > i, .mini-sidebar > span, .mini-paper > i) {
+  background: var(--selected);
+}
+[data-theme="dark"] .mini-sidebar > span:first-child {
+  background: #5879b7;
+}
+
+[data-theme="dark"]
+  :is(
+    .file-pane,
+    .reader-toolbar,
+    .reading-paper,
+    .reader-status,
+    .full-assistant-frame
+  ) {
+  background: var(--panel);
+}
+[data-theme="dark"]
+  :is(
+    .library-heading h1 > span,
+    .nav-item small,
+    .file-pane-header > div:first-child > div
+  ) {
+  background: var(--selected);
+  color: var(--link);
+}
+[data-theme="dark"] .inline-error {
+  background: #3b252d;
+}
+
+[data-theme="dark"] :is(.config-form input:not([type=checkbox]),.config-form textarea,.chunk-options input:not([type=checkbox]),.chunk-options select,.chat-controls select) {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+}
+[data-theme="dark"] :is(.manage-tabs,.config-form fieldset,.chunk-options,.chat-full,.chat-controls,.tool-progress,.discovered-tools article,.calls-list article,.chunk-list article) {
+  border-color: var(--line);
+}
+[data-theme="dark"] .manage-list>button.selected {
+  background: var(--selected);
+  border-color: var(--line);
+}
+[data-theme="dark"] :is(.manage-list span,.config-form>p,.calls-list small,.retrieval-detail) {
+  color: var(--muted);
+}

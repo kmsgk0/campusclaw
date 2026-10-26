@@ -6,7 +6,7 @@
 
 ## 技术栈
 
-账号认证、班级隔离与材料管理的规约和实现位于同一仓库，认证采用 JWT Bearer token。后端采用 Flask、SQLite；前端采用 React、Radix Themes 与 Vite。界面是 sage/jade 配色的材料工作台，支持搜索、阅读、列表/网格、深浅色和上传弹窗。
+账号认证、班级隔离与材料管理的规约和实现位于同一仓库，认证采用 JWT Bearer token。后端采用 Flask、SQLite；前端采用 React、Radix Dialog/Tabs 与 Vite。界面是 sage/jade 配色的材料工作台，支持搜索、阅读、列表/网格、深浅色和上传弹窗。
 
 ## 启动
 
@@ -16,7 +16,7 @@
 cp .env.example .env
 # 设置 SEED_PASSWORD、JWT_SECRET，以及 .env.example 中的向量和对话服务配置
 docker compose up --build -d
-docker compose exec app flask --app app:create_app index-materials
+docker compose exec app flask --app backend.app:create_app index-materials
 ```
 
 浏览器访问 `http://localhost:8080`。预置账号为 `teacher_a`、`student_a1`、`student_b1`，初始密码均来自 `SEED_PASSWORD`。前两个账号属于 A 班，第三个属于 B 班。修改环境变量不会覆盖已有用户的密码哈希。
@@ -33,7 +33,7 @@ docker compose exec app flask --app app:create_app index-materials
 npm --prefix web ci
 npm --prefix web run build
 uv sync
-uv run gunicorn --bind 127.0.0.1:8080 --workers 1 --threads 4 'app:create_app()'
+uv run gunicorn --bind 127.0.0.1:8080 --workers 1 --threads 4 'backend.app:create_app()'
 uv run python -m pytest -q
 ```
 
@@ -76,3 +76,7 @@ uv run python -m pytest -q
 | `POST /api/materials/{id}/index` | 教师重新建立本班材料索引 |
 
 网关错误、额度不足和无效引用会明确报错，不自动重试或切换服务。回答输出预算为 512 token。服务日志仅记录接口返回的 token 用量，不记录问题、原文或密钥。`docker compose logs app` 可查看用量；未返回用量的接口不会被记作零消耗。
+
+## Workspace development
+
+Backend modules and the SQL schema are in `backend/`. Run `npm --prefix web run dev` for the Vite interface on port 5174, with Compose running on port 8080. The workspace provides light/dark themes, original-source dialogs and resizable reading columns.

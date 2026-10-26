@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from qdrant_client import QdrantClient, models
 
-from app import create_app
+from backend.app import create_app
 
 
 class Gateway:
@@ -17,7 +17,7 @@ class Gateway:
     def embed(self, text):
         self.embeddings.append(text)
         if self.fail:
-            from knowledge import ServiceError
+            from backend.knowledge import ServiceError
             raise ServiceError('向量服务暂不可用')
         if '天气' in text:
             return [0., 0., 1.]
@@ -108,7 +108,7 @@ def test_reuse_and_failed_index_retry(env):
 
 
 def test_chunk_offsets_and_complete_pagination(env):
-    from knowledge import chunks
+    from backend.knowledge import chunks
     text = ('第一段😀。\r\n第二行文字。\n\n'*1500)
     parts = chunks(text)
     assert parts[0]['start_offset'] == 0 and parts[-1]['end_offset'] == len(text)
@@ -142,7 +142,7 @@ def test_invalid_requests_and_vector_cross_class_recheck(env):
 
 
 def test_vector_failure_reuses_paid_embeddings_on_retry(env, monkeypatch):
-    from knowledge import ServiceError
+    from backend.knowledge import ServiceError
     app, gateway, vectors, (teacher, _, _) = env
     service=app.extensions['knowledge']
     original=service.vector_call
@@ -161,7 +161,7 @@ def test_vector_failure_reuses_paid_embeddings_on_retry(env, monkeypatch):
 
 def test_gateway_validates_protocol_and_logs_usage_without_content(monkeypatch, caplog):
     import json
-    from knowledge import ModelGateway, ServiceError
+    from backend.knowledge import ModelGateway, ServiceError
     config={'EMBEDDING_BASE_URL':'https://model.invalid/v1','EMBEDDING_API_KEY':'secret-test-key','EMBEDDING_MODEL':'embedding-test','EMBEDDING_DIM':3,
             'CHAT_BASE_URL':'https://model.invalid/v1','CHAT_API_KEY':'secret-test-key','CHAT_MODEL':'chat-test'}
     gateway=ModelGateway(config)

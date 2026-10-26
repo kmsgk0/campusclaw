@@ -10,3 +10,7 @@ uploads/
 web/node_modules/
 static/dist/
 .DS_Store
+
+apitest/reports/
+web/test-results/
+web/playwright-report/

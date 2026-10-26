@@ -4,7 +4,12 @@
 data
 uploads
 tests
-__pycache__
+**/__pycache__
 .pytest_cache
 web/node_modules
 static/dist
+
+.ruff_cache
+apitest/reports
+web/test-results
+web/playwright-report

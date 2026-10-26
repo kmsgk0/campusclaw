@@ -6,7 +6,7 @@ import time
 import jwt
 import pytest
 
-from app import MAX_FILE_BYTES, SESSION_SECONDS, create_app
+from backend.app import MAX_FILE_BYTES, SESSION_SECONDS, create_app
 
 PASSWORD = "test-only-password-2026"
 

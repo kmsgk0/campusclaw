@@ -6,12 +6,12 @@ Provide class-scoped knowledge retrieval and concise answers with verifiable ori
 ## Requirements
 
 ### Requirement: Persistent traceable indexing
-The system MUST index original TXT/Markdown text into bounded overlapping chunks with original Unicode character offsets, keyword tokens and persistent vectors.
+The system MUST index original TXT/Markdown text into configurable auto, custom or Markdown hierarchy chunks with original Unicode source ranges, keyword tokens and persistent vectors.
 
 #### Scenario: Index and reuse
 - **WHEN** a teacher uploads material or runs the backfill command
 - **THEN** every nonempty chunk is stored with material identity, ordinal and exact original range
-- **AND** successful embeddings are reused for unchanged text with the same provider/model/dimension within the class, including after restart or duplicate upload
+- **AND** successful embeddings are reused for unchanged chunk text with the same provider/model/dimension within the class, including after restart or duplicate upload
 
 #### Scenario: Failed indexing
 - **WHEN** the external index or embedding request fails
@@ -80,3 +80,17 @@ The system MUST expose existing class-scoped retrieval, answers and protected or
 - **AND** failed questions remain available for correction and no fabricated answer is substituted
 - **WHEN** a user opens and closes a cited original source
 - **THEN** the protected material's exact Unicode range is highlighted and closing the dialog leaves the workspace usable
+
+### Requirement: Configurable material processing
+The system MUST support auto, custom and Markdown hierarchy chunking while preserving uploaded originals.
+
+#### Scenario: Upload and rebuild
+- **WHEN** a teacher selects a strategy on upload or rebuild
+- **THEN** the selected strategy controls chunk boundaries and replaces the previous index
+- **AND** custom length, overlap, separators and preprocessing are validated
+- **AND** source navigation uses original text coordinates
+
+#### Scenario: Inspect retrieval
+- **WHEN** an authorized user inspects material chunks or retrieval results
+- **THEN** chunk identity, source ranges, index state and retrieval ranks are available
+- **AND** keyword retrieval remains usable independently of Qdrant

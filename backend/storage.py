@@ -1,16 +1,24 @@
+import json
 from pathlib import Path
 from werkzeug.security import generate_password_hash
+
 
 def initialize(conn, password, upload_dir):
     conn.executescript(Path(__file__).with_name("schema.sql").read_text())
     if not conn.execute("SELECT 1 FROM users LIMIT 1").fetchone():
-        conn.executemany("INSERT INTO classes(id, name) VALUES (?, ?)", [(1, "A 班"), (2, "B 班")])
+        conn.executemany(
+            "INSERT INTO classes(id, name) VALUES (?, ?)",
+            [(1, "A 班"), (2, "B 班")],
+        )
         password_hash = generate_password_hash(password, method="scrypt")
         conn.executemany(
             "INSERT INTO users(username, display_name, password_hash, role, class_id) VALUES (?, ?, ?, ?, ?)",
-            [("teacher_a", "A 班教师", password_hash, "teacher", 1),
-             ("student_a1", "A 班学生", password_hash, "student", 1),
-             ("student_b1", "B 班学生", password_hash, "student", 2)],
+            [
+                ("teacher_a", "A 班教师", password_hash, "teacher", 1),
+                ("student_a1", "A 班学生", password_hash, "student", 1),
+                ("student_b1", "B 班学生", password_hash, "student", 2),
+                ("teacher_b", "B 班教师", password_hash, "teacher", 2),
+            ],
         )
         for class_id in (1, 2):
             letter = "A" if class_id == 1 else "B"
@@ -19,6 +27,18 @@ def initialize(conn, password, upload_dir):
             (upload_dir / filename).write_text(body, encoding="utf-8")
             cur = conn.execute(
                 "INSERT INTO materials(class_id,title,original_name,storage_name,size_bytes,uploaded_by) VALUES(?,?,?,?,?,?)",
-                (class_id, f"{letter} 班学习材料", f"{letter}班学习材料.md", filename, len(body.encode()), 1 if class_id == 1 else 3),
+                (
+                    class_id,
+                    f"{letter} 班学习材料",
+                    f"{letter}班学习材料.md",
+                    filename,
+                    len(body.encode()),
+                    1 if class_id == 1 else 3,
+                ),
             )
-            conn.execute("INSERT INTO knowledge_entries(material_id,class_id,body_text) VALUES(?,?,?)", (cur.lastrowid, class_id, body))
+            conn.execute(
+                "INSERT INTO knowledge_entries(material_id,class_id,body_text) VALUES(?,?,?)",
+                (cur.lastrowid, class_id, body),
+            )
+
+    conn.commit()

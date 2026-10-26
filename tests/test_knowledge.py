@@ -83,7 +83,7 @@ def test_no_hit_and_bad_citations(env):
     assert response.json == {'answer':'资料中未找到相关内容','citations':[]}
     assert not gateway.chats
     gateway.response = '答案来自另一本书。[99]'
-    assert student.post('/api/ask', json={'question':'磁铁吸木块吗？'}).status_code == 502
+    assert student.post('/api/ask', json={'question':'磁铁吸木块吗？'}).status_code == 503
 
 
 def test_reuse_and_failed_index_retry(env):
@@ -102,7 +102,8 @@ def test_reuse_and_failed_index_retry(env):
     failed = upload(teacher, '水受热后成为水蒸气。').json
     assert failed['index_status'] == 'failed' and failed['index_error']
     assert teacher.get(f"/api/materials/{failed['material_id']}").status_code == 200
-    assert teacher.get('/api/search?q=水蒸气&mode=keyword').status_code == 502
+    assert teacher.get('/api/search?q=水蒸气&mode=keyword').json['hits'] == []
+    assert teacher.get('/api/search?q=磁铁&mode=keyword').json['total'] == 2
     gateway.fail = False
     assert teacher.post(f"/api/materials/{failed['material_id']}/index").json['index_status'] == 'ready'
 
@@ -193,3 +194,27 @@ def test_question_words_are_not_evidence_and_model_can_abstain(env):
     gateway.response='资料中未找到相关内容'
     result=student.post('/api/ask',json={'question':'磁铁相关资料能回答这个问题吗？'})
     assert result.status_code==200 and result.json['citations']==[]
+
+
+def test_chunk_strategies_preserve_source_ranges():
+    from backend.chunking import split_text
+
+    text = "# 数学\n" + "方程的两边同时加一。" * 30 + "\n## 语文\n古诗默写。"
+    parts = split_text(text, {"strategy": "hierarchy"})
+    assert len(parts) >= 2 and "## 语文" in parts[-1]["text"]
+    assert all(
+        text[p["start_offset"] : p["end_offset"]] == p["source_text"] for p in parts
+    )
+    parts = split_text(
+        "开头 https://example.com 结尾\n\n下一段。",
+        {
+            "strategy": "custom",
+            "max_chars": 100,
+            "overlap": 0,
+            "remove_links": True,
+            "collapse_whitespace": True,
+        },
+    )
+    assert "https://" not in parts[0]["text"] and "https://" in parts[0]["source_text"]
+    with pytest.raises(ValueError):
+        split_text(text, {"strategy": "custom", "max_chars": 2})

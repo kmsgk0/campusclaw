@@ -78,7 +78,7 @@ def test_seeds_and_restart(app):
     assert state(restarted) == before
     with sqlite3.connect(app.config["DATA_DIR"] / "campusclaw.sqlite3") as conn:
         users = conn.execute("SELECT username,password_hash FROM users").fetchall()
-        assert len(users) == 3 and all(value.startswith("scrypt:") and value != PASSWORD for _, value in users)
+        assert len(users) == 4 and all(value.startswith("scrypt:") and value != PASSWORD for _, value in users)
     assert restarted.test_client().post("/api/login", json={"username": "missing", "password": "wrong"}).status_code == 401
 
 
@@ -103,7 +103,8 @@ def test_wrong_password_and_limit(app):
     for i in range(10):
         response = client.post("/api/login", json={"username": "teacher_a" if i % 2 else "missing", "password": "wrong"})
         assert response.status_code == 401 and response.json == {"error": "账号或密码错误"}
-    assert login(client).status_code == 429
+    assert login(client).status_code == 401
+    assert login(client).json == {"error": "账号或密码错误"}
 
 
 def test_upload_read_download_and_isolation(app):

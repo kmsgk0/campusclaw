@@ -8,12 +8,13 @@ from pathlib import Path
 from uuid import uuid4
 
 import jwt
-from . import knowledge, storage
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request, send_file
 from markdown_it import MarkdownIt
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from . import api_docs, knowledge, storage
 
 MAX_FILE_BYTES = 2 * 1024 * 1024
 SESSION_SECONDS = 8 * 60 * 60
@@ -30,7 +31,9 @@ def render_markdown(text):
 
 def create_app(config=None):
     load_dotenv()
-    app = Flask(__name__, static_folder=str(Path(__file__).resolve().parents[1] / "static"))
+    app = Flask(
+        __name__, static_folder=str(Path(__file__).resolve().parents[1] / "static")
+    )
     app.config.update(
         DATA_DIR=os.getenv("DATA_DIR", "data"),
         UPLOAD_DIR=os.getenv("UPLOAD_DIR", "uploads"),
@@ -44,6 +47,8 @@ def create_app(config=None):
         CHAT_BASE_URL=os.getenv("CHAT_BASE_URL", ""),
         CHAT_API_KEY=os.getenv("CHAT_API_KEY", ""),
         CHAT_MODEL=os.getenv("CHAT_MODEL", ""),
+        MCP_MAX_ROUNDS=int(os.getenv("MCP_MAX_ROUNDS", "3")),
+        MCP_MAX_CALLS=int(os.getenv("MCP_MAX_CALLS", "24")),
         QDRANT_URL=os.getenv("QDRANT_URL", "http://qdrant:6333"),
     )
     if config:
@@ -73,8 +78,9 @@ def create_app(config=None):
 
     @app.teardown_appcontext
     def close_db(_error):
-        if "db" in g:
-            g.db.close()
+        connection = g.pop("db", None)
+        if connection is not None:
+            connection.close()
 
     with connect() as conn:
         storage.initialize(conn, app.config["SEED_PASSWORD"], upload_dir)
@@ -84,21 +90,37 @@ def create_app(config=None):
         g.user = None
         g.token = None
         authorization = request.authorization
-        if authorization and authorization.type.lower() == "bearer" and authorization.token:
+        if (
+            authorization
+            and authorization.type.lower() == "bearer"
+            and authorization.token
+        ):
             token = authorization.token
             try:
-                claims = jwt.decode(token, app.config["JWT_SECRET"], algorithms=["HS256"],
-                                    options={"require": ["sub", "iat", "exp", "jti"]})
+                claims = jwt.decode(
+                    token,
+                    app.config["JWT_SECRET"],
+                    algorithms=["HS256"],
+                    options={"require": ["sub", "iat", "exp", "jti"]},
+                )
             except jwt.InvalidTokenError:
                 claims = None
             if claims is not None:
                 g.token = token
-                g.user = db().execute(
-                    "SELECT u.id,u.username,u.display_name,u.role,u.class_id,c.name class_name "
-                    "FROM sessions s JOIN users u ON u.id=s.user_id JOIN classes c ON c.id=u.class_id "
-                    "WHERE s.token_hash=? AND s.expires_at>? AND CAST(u.id AS TEXT)=?",
-                    (hashlib.sha256(token.encode()).hexdigest(), time.time(), claims["sub"]),
-                ).fetchone()
+                g.user = (
+                    db()
+                    .execute(
+                        "SELECT u.id,u.username,u.display_name,u.role,u.class_id,c.name class_name "
+                        "FROM sessions s JOIN users u ON u.id=s.user_id JOIN classes c ON c.id=u.class_id "
+                        "WHERE s.token_hash=? AND s.expires_at>? AND CAST(u.id AS TEXT)=?",
+                        (
+                            hashlib.sha256(token.encode()).hexdigest(),
+                            time.time(),
+                            claims["sub"],
+                        ),
+                    )
+                    .fetchone()
+                )
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
             origin = request.headers.get("Origin")
             if origin and origin != request.host_url.rstrip("/"):
@@ -106,16 +128,27 @@ def create_app(config=None):
 
     @app.after_request
     def headers(response):
-        response.headers["Cache-Control"] = "no-store"
+        response.headers.setdefault("Cache-Control", "no-store")
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        )
         return response
 
     @app.errorhandler(HTTPException)
     def http_error(error):
-        messages = {400: "请求内容不正确", 404: "材料不存在", 405: "请求方法不允许", 413: "文件不能超过 2 MiB"}
-        return jsonify(error=messages.get(error.code, error.name)), error.code
+        messages = {
+            400: "请求内容不正确",
+            404: "材料不存在",
+            405: "请求方法不允许",
+            413: "文件不能超过 2 MiB",
+        }
+        return jsonify(
+            error=error.description
+            if error.description != type(error).description
+            else messages.get(error.code, error.name)
+        ), error.code
 
     def login_required(fn):
         @wraps(fn)
@@ -123,6 +156,7 @@ def create_app(config=None):
             if g.user is None:
                 return jsonify(error="请先登录"), 401
             return fn(*args, **kwargs)
+
         return wrapped
 
     @app.get("/health")
@@ -139,33 +173,72 @@ def create_app(config=None):
 
     @app.post("/api/login")
     def login():
-        address = request.remote_addr
+        payload = request.get_json(silent=True)
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("username"), str)
+            or not isinstance(payload.get("password"), str)
+        ):
+            return jsonify(error="请提供账号和密码"), 400
+        address = (request.remote_addr, payload["username"])
         now = time.time()
         recent = [stamp for stamp in failures.get(address, []) if stamp > now - 300]
         failures[address] = recent
-        if len(recent) >= 10:
-            return jsonify(error="登录失败次数过多，请 5 分钟后再试"), 429
+        if len(recent) >= 5:
+            check_password_hash(dummy_hash, payload["password"])
+            return jsonify(error="账号或密码错误"), 401
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get("username"), str) or not isinstance(payload.get("password"), str):
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("username"), str)
+            or not isinstance(payload.get("password"), str)
+        ):
             return jsonify(error="请提供账号和密码"), 400
-        user = db().execute("SELECT * FROM users WHERE username=?", (payload["username"],)).fetchone()
+        user = (
+            db()
+            .execute("SELECT * FROM users WHERE username=?", (payload["username"],))
+            .fetchone()
+        )
         # The dummy hash keeps unknown-user and incorrect-password work comparable.
-        valid = check_password_hash(user["password_hash"] if user else dummy_hash, payload["password"])
+        valid = check_password_hash(
+            user["password_hash"] if user else dummy_hash, payload["password"]
+        )
         if not user or not valid:
             failures[address].append(now)
             return jsonify(error="账号或密码错误"), 401
         failures.pop(address, None)
         issued_at = int(now)
         expires_at = issued_at + SESSION_SECONDS
-        token = jwt.encode({"sub": str(user["id"]), "iat": issued_at, "exp": expires_at,
-                            "jti": secrets.token_urlsafe(24)}, app.config["JWT_SECRET"], algorithm="HS256")
+        token = jwt.encode(
+            {
+                "sub": str(user["id"]),
+                "iat": issued_at,
+                "exp": expires_at,
+                "jti": secrets.token_urlsafe(24),
+            },
+            app.config["JWT_SECRET"],
+            algorithm="HS256",
+        )
         with db() as conn:
             if g.token:
-                conn.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(g.token.encode()).hexdigest(),))
+                conn.execute(
+                    "DELETE FROM sessions WHERE token_hash=?",
+                    (hashlib.sha256(g.token.encode()).hexdigest(),),
+                )
             conn.execute("DELETE FROM sessions WHERE expires_at<=?", (now,))
-            conn.execute("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), user["id"], expires_at))
-        return jsonify(token=token, token_type="Bearer", expires_in=SESSION_SECONDS,
-                       user={key: user[key] for key in ("id", "username", "display_name", "role", "class_id")})
+            conn.execute(
+                "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
+                (hashlib.sha256(token.encode()).hexdigest(), user["id"], expires_at),
+            )
+        return jsonify(
+            token=token,
+            token_type="Bearer",
+            expires_in=SESSION_SECONDS,
+            user={
+                key: user[key]
+                for key in ("id", "username", "display_name", "role", "class_id")
+            },
+        )
 
     @app.get("/api/me")
     @login_required
@@ -176,27 +249,40 @@ def create_app(config=None):
     @login_required
     def logout():
         with db() as conn:
-            conn.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(g.token.encode()).hexdigest(),))
+            conn.execute(
+                "DELETE FROM sessions WHERE token_hash=?",
+                (hashlib.sha256(g.token.encode()).hexdigest(),),
+            )
         return jsonify(message="已退出登录")
 
     @app.get("/api/materials")
     @login_required
     def materials():
         query = request.args.get("q", "").strip()
-        rows = db().execute(
-            "SELECT m.id,m.title,m.original_name,m.size_bytes,m.created_at,u.display_name author,COALESCE(i.status,'pending') index_status,i.error index_error "
-            "FROM materials m JOIN users u ON m.uploaded_by=u.id JOIN knowledge_entries k ON k.material_id=m.id LEFT JOIN material_indexes i ON i.material_id=m.id "
-            "WHERE m.class_id=? AND (?='' OR instr(lower(m.title),lower(?))>0 OR instr(lower(k.body_text),lower(?))>0) "
-            "ORDER BY m.id DESC", (g.user["class_id"], query, query, query),
-        ).fetchall()
+        rows = (
+            db()
+            .execute(
+                "SELECT m.id,m.title,m.original_name,m.size_bytes,m.created_at,u.display_name author,COALESCE(i.status,'pending') index_status,i.error index_error "
+                "FROM materials m JOIN users u ON m.uploaded_by=u.id JOIN knowledge_entries k ON k.material_id=m.id LEFT JOIN material_indexes i ON i.material_id=m.id "
+                "WHERE m.class_id=? AND (?='' OR instr(lower(m.title),lower(?))>0 OR instr(lower(k.body_text),lower(?))>0) "
+                "ORDER BY m.id DESC",
+                (g.user["class_id"], query, query, query),
+            )
+            .fetchall()
+        )
         return jsonify(materials=[dict(row) for row in rows])
 
     def find_material(material_id):
-        return db().execute(
-            "SELECT m.*,k.body_text,u.display_name author FROM materials m "
-            "JOIN knowledge_entries k ON k.material_id=m.id JOIN users u ON u.id=m.uploaded_by "
-            "WHERE m.id=? AND m.class_id=?", (material_id, g.user["class_id"]),
-        ).fetchone()
+        return (
+            db()
+            .execute(
+                "SELECT m.*,k.body_text,u.display_name author FROM materials m "
+                "JOIN knowledge_entries k ON k.material_id=m.id JOIN users u ON u.id=m.uploaded_by "
+                "WHERE m.id=? AND m.class_id=?",
+                (material_id, g.user["class_id"]),
+            )
+            .fetchone()
+        )
 
     @app.get("/api/materials/<int:material_id>")
     @login_required
@@ -204,8 +290,22 @@ def create_app(config=None):
         row = find_material(material_id)
         if row is None:
             return jsonify(error="材料不存在"), 404
-        return jsonify(material={key: row[key] for key in ("id", "title", "original_name", "created_at", "author", "body_text")},
-                       rendered_html=render_markdown(row["body_text"]) if row["original_name"].lower().endswith(".md") else None)
+        return jsonify(
+            material={
+                key: row[key]
+                for key in (
+                    "id",
+                    "title",
+                    "original_name",
+                    "created_at",
+                    "author",
+                    "body_text",
+                )
+            },
+            rendered_html=render_markdown(row["body_text"])
+            if row["original_name"].lower().endswith(".md")
+            else None,
+        )
 
     @app.get("/api/materials/<int:material_id>/file")
     @login_required
@@ -213,13 +313,22 @@ def create_app(config=None):
         row = find_material(material_id)
         if row is None:
             return jsonify(error="材料不存在"), 404
-        return send_file((upload_dir / row["storage_name"]).resolve(), as_attachment=True, download_name=row["original_name"], mimetype="text/plain; charset=utf-8")
+        return send_file(
+            (upload_dir / row["storage_name"]).resolve(),
+            as_attachment=True,
+            download_name=row["original_name"],
+            mimetype="text/plain; charset=utf-8",
+        )
 
     @app.post("/api/materials")
     @login_required
     def upload():
         if g.user["role"] != "teacher":
             return jsonify(error="仅教师可以上传材料"), 403
+        try:
+            chunk_config = knowledge.chunk_options(request.form)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
         file = request.files.get("file")
         if not file or not file.filename:
             return jsonify(error="请选择文件"), 400
@@ -242,16 +351,35 @@ def create_app(config=None):
         try:
             destination.write_bytes(content)
             with db() as conn:
-                cur = conn.execute("INSERT INTO materials(class_id,title,original_name,storage_name,size_bytes,uploaded_by) VALUES(?,?,?,?,?,?)",
-                                   (g.user["class_id"], title, original_name, storage_name, len(content), g.user["id"]))
+                cur = conn.execute(
+                    "INSERT INTO materials(class_id,title,original_name,storage_name,size_bytes,uploaded_by) VALUES(?,?,?,?,?,?)",
+                    (
+                        g.user["class_id"],
+                        title,
+                        original_name,
+                        storage_name,
+                        len(content),
+                        g.user["id"],
+                    ),
+                )
                 material_id = cur.lastrowid
-                conn.execute("INSERT INTO knowledge_entries(material_id,class_id,body_text) VALUES(?,?,?)", (material_id, g.user["class_id"], body))
+                conn.execute(
+                    "INSERT INTO knowledge_entries(material_id,class_id,body_text) VALUES(?,?,?)",
+                    (material_id, g.user["class_id"], body),
+                )
         except (OSError, sqlite3.Error):
             destination.unlink(missing_ok=True)
             app.logger.exception("Material ingestion failed")
             return jsonify(error="材料保存失败，请稍后重试"), 500
-        index = search_service.index_material(db(), material_id)
-        return jsonify(material_id=material_id, message="材料已保存，索引已就绪" if index['index_status']=='ready' else "材料已保存，但索引未完成", **index), 201
+        index = search_service.index_material(db(), material_id, config=chunk_config)
+        return jsonify(
+            material_id=material_id,
+            message="材料已保存，索引已就绪"
+            if index["index_status"] == "ready"
+            else "材料已保存，但索引未完成",
+            **index,
+        ), 201
 
     search_service = knowledge.register(app, db, login_required, find_material)
+    api_docs.register(app)
     return app

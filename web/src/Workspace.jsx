@@ -35,6 +35,7 @@ import {
   ThemeToggle,
   cx,
 } from "./ui.jsx";
+import ChunkOptions, { defaultChunks } from "./ChunkOptions.jsx";
 import Ask from "./Ask.jsx";
 import SearchView from "./Search.jsx";
 import SourceModal from "./SourceModal.jsx";
@@ -82,6 +83,10 @@ export default function Workspace({ dark, onToggleTheme }) {
   );
   const [messages, setMessages] = useState([]);
   const [source, setSource] = useState(null);
+  const [chunkOptions, setChunkOptions] = useState(defaultChunks);
+  const [indexTarget, setIndexTarget] = useState(null);
+  const [indexData, setIndexData] = useState(null);
+  const [indexError, setIndexError] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -204,6 +209,9 @@ export default function Workspace({ dark, onToggleTheme }) {
     setUploadError("");
     const body = new FormData();
     body.set("file", chosenFile);
+    Object.entries(chunkOptions).forEach(([key, value]) =>
+      body.set(key, String(value)),
+    );
     try {
       const result = await api("/api/materials", { method: "POST", body });
       setSelected(result.material_id);
@@ -225,17 +233,32 @@ export default function Workspace({ dark, onToggleTheme }) {
       setUploadBusy(false);
     }
   }
-  async function reindex(id) {
+  async function reindex(id, config = defaultChunks) {
     setIndexBusy(id);
     try {
       await api(`/api/materials/${id}/index`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
       });
+      if (indexTarget) setIndexData(await api(`/api/materials/${id}/chunks`));
       setRevision((value) => value + 1);
     } catch (error) {
       setNotice(error.message);
     } finally {
       setIndexBusy(null);
+    }
+  }
+  async function inspectIndex(id) {
+    setIndexTarget(id);
+    setIndexData(null);
+    setIndexError("");
+    try {
+      const data = await api(`/api/materials/${id}/chunks`);
+      setIndexData(data);
+      setChunkOptions({ ...defaultChunks, ...data.options });
+    } catch (error) {
+      setIndexError(error.message);
     }
   }
   function openMaterial(id) {
@@ -566,6 +589,15 @@ export default function Workspace({ dark, onToggleTheme }) {
                       </span>
                     </div>
                     {detail && (
+                      <Button
+                        size="small"
+                        variant="ghost"
+                        onClick={() => inspectIndex(selected)}
+                      >
+                        切片与索引
+                      </Button>
+                    )}
+                    {detail && (
                       <IconButton label="下载原文件" onClick={download}>
                         <ArrowDownToLine size={17} />
                       </IconButton>
@@ -697,6 +729,53 @@ export default function Workspace({ dark, onToggleTheme }) {
           <Ask messages={messages} setMessages={setMessages} readyCount={readyCount} onSource={setSource} />
         </Modal>
       )}
+      <Modal
+        open={indexTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setIndexTarget(null);
+        }}
+        title="切片与索引"
+        description="查看检索片段及其在原文中的位置。"
+      >
+        {indexError && <p className="inline-error">{indexError}</p>}
+        {teacher && (
+          <>
+            <ChunkOptions value={chunkOptions} onChange={setChunkOptions} />
+            <Button
+              busy={indexBusy !== null}
+              onClick={() => reindex(indexTarget, chunkOptions)}
+            >
+              按此策略重建索引
+            </Button>
+          </>
+        )}
+        {indexData ? (
+          <div className="chunk-list">
+            {indexData.chunks.map((part) => (
+              <article key={part.id}>
+                <strong>切片 {part.chunk_index + 1}</strong>
+                <p>{part.text}</p>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => {
+                    setSource({
+                      ...part,
+                      material_id: indexTarget,
+                      title: materials.find((m) => m.id === indexTarget)?.title,
+                    });
+                    setIndexTarget(null);
+                  }}
+                >
+                  查看原文位置 {part.start_offset} 至 {part.end_offset}
+                </Button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          !indexError && <Loading />
+        )}
+      </Modal>
       <SourceModal
         source={source}
         onClose={() => setSource(null)}
@@ -750,6 +829,7 @@ export default function Workspace({ dark, onToggleTheme }) {
                 : "支持 Markdown、TXT · UTF-8 · 最大 2 MiB"}
             </span>
           </label>
+          <ChunkOptions value={chunkOptions} onChange={setChunkOptions} />
           {uploadError && (
             <p className="inline-error" role="alert">
               {uploadError}

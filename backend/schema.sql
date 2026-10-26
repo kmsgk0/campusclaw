@@ -20,11 +20,17 @@ CREATE TABLE IF NOT EXISTS knowledge_entries (
 CREATE INDEX IF NOT EXISTS material_class ON materials(class_id,id);
 CREATE TABLE IF NOT EXISTS assignments (id INTEGER PRIMARY KEY, class_id INTEGER REFERENCES classes(id), title TEXT);
 CREATE TABLE IF NOT EXISTS assistants (id INTEGER PRIMARY KEY, class_id INTEGER REFERENCES classes(id), name TEXT);
-CREATE TABLE IF NOT EXISTS skills (id INTEGER PRIMARY KEY, name TEXT UNIQUE, enabled INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS skills (
+ id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), name TEXT NOT NULL,
+ enabled INTEGER NOT NULL DEFAULT 1, trigger_text TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
+ subject_text TEXT NOT NULL DEFAULT '', tools_json TEXT NOT NULL DEFAULT '[]', source_text TEXT NOT NULL DEFAULT '',
+ seed_key TEXT, UNIQUE(class_id,name), UNIQUE(class_id,seed_key)
+);
 
 CREATE TABLE IF NOT EXISTS material_indexes (
  material_id INTEGER PRIMARY KEY REFERENCES materials(id), signature TEXT NOT NULL,
- status TEXT NOT NULL CHECK(status IN ('pending','ready','failed')), error TEXT
+ status TEXT NOT NULL CHECK(status IN ('pending','ready','failed')), error TEXT,
+ options_json TEXT NOT NULL DEFAULT '{}'
 );
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
  id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER NOT NULL REFERENCES materials(id),

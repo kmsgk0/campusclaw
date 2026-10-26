@@ -80,3 +80,7 @@ uv run python -m pytest -q
 ## Workspace development
 
 Backend modules and the SQL schema are in `backend/`. Run `npm --prefix web run dev` for the Vite interface on port 5174, with Compose running on port 8080. The workspace provides light/dark themes, original-source dialogs and resizable reading columns.
+
+## Material processing
+
+Upload and index rebuild support automatic windows, custom length/overlap/separators and Markdown heading sections. Inspect original source ranges in the material index dialog. `/swagger` and `/openapi.json` document the available APIs.

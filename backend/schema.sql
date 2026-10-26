@@ -68,6 +68,22 @@ CREATE TABLE IF NOT EXISTS messages (
  citations_json TEXT NOT NULL DEFAULT '[]', skill_name TEXT, tools_json TEXT NOT NULL DEFAULT '[]',
  status TEXT NOT NULL DEFAULT 'complete', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+CREATE TABLE IF NOT EXISTS mcp_servers (
+ id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), name TEXT NOT NULL,
+ base_url TEXT NOT NULL, token TEXT NOT NULL, connected INTEGER NOT NULL DEFAULT 0,
+ error TEXT, UNIQUE(class_id,name)
+);
+CREATE TABLE IF NOT EXISTS mcp_tools (
+ server_id INTEGER NOT NULL REFERENCES mcp_servers(id) ON DELETE CASCADE, name TEXT NOT NULL,
+ description TEXT NOT NULL, schema_json TEXT NOT NULL, PRIMARY KEY(server_id,name)
+);
+CREATE TABLE IF NOT EXISTS tool_calls (
+ id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), server_name TEXT NOT NULL,
+ tool_ref TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('ok','denied','error')),
+ user_id INTEGER NOT NULL REFERENCES users(id), conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+ round INTEGER NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
 CREATE INDEX IF NOT EXISTS conversation_owner ON conversations(user_id,class_id,updated_at);
 CREATE INDEX IF NOT EXISTS message_conversation ON messages(conversation_id,id);
+CREATE INDEX IF NOT EXISTS calls_class ON tool_calls(class_id,id);
 CREATE INDEX IF NOT EXISTS knowledge_class ON knowledge_entries(class_id);

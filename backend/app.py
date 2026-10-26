@@ -14,7 +14,7 @@ from markdown_it import MarkdownIt
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import agents, api_docs, knowledge, storage
+from . import agents, api_docs, knowledge, storage, tools_api
 
 MAX_FILE_BYTES = 2 * 1024 * 1024
 SESSION_SECONDS = 8 * 60 * 60
@@ -381,6 +381,7 @@ def create_app(config=None):
         ), 201
 
     search_service = knowledge.register(app, db, login_required, find_material)
+    tools_api.register(app, db, login_required)
     agents.register(app, db, login_required, search_service)
     api_docs.register(app)
     return app

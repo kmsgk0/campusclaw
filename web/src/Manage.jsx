@@ -16,10 +16,18 @@ export default function Manage() {
       agents: [],
       skills: [],
       materials: [],
+      servers: [],
+      calls: [],
     });
   const [agent, setAgent] = useState(emptyAgent),
-    [skill, setSkill] = useState({ source_text: sample });
-  const [error, setError] = useState(""),
+    [skill, setSkill] = useState({ source_text: sample }),
+    [server, setServer] = useState({
+      name: "campus-tools",
+      base_url: "http://mcp-tools:8090",
+      token: "",
+    });
+  const [tools, setTools] = useState({}),
+    [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   async function reload() {
@@ -27,6 +35,8 @@ export default function Manage() {
       "agents",
       "skills",
       "materials",
+      "mcp/servers",
+      "mcp/tool-calls",
     ];
     const results = await Promise.all(paths.map((p) => api("/api/" + p)));
     setData(Object.assign({}, ...results));
@@ -66,7 +76,7 @@ export default function Manage() {
       <div className="section-heading">
         <div>
           <h1>教学配置</h1>
-          <p>配置助手、技能与绑定材料。</p>
+          <p>配置助手、技能与可调用的工具。</p>
         </div>
         <a
           className="button button-outline"
@@ -81,6 +91,8 @@ export default function Manage() {
         {[
           ["agents", "智能体"],
           ["skills", "技能"],
+          ["servers", "工具服务"],
+          ["calls", "调用记录"],
         ].map(([id, name]) => (
           <button
             role="tab"
@@ -287,6 +299,202 @@ export default function Manage() {
               )}
             </div>
           </form>
+        </div>
+      )}
+      {tab === "servers" && (
+        <div className="manage-columns">
+          <div className="manage-list">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setServer({
+                  name: "",
+                  base_url: "http://mcp-tools:8090",
+                  token: "",
+                })
+              }
+            >
+              登记工具服务
+            </Button>
+            {data.servers.map((s) => (
+              <button
+                className={server.id === s.id ? "selected" : ""}
+                key={s.id}
+                onClick={() => setServer({ ...s, token: "" })}
+              >
+                <strong>{s.name}</strong>
+                <span>{s.connected ? "已连接" : "未连接"}</span>
+              </button>
+            ))}
+          </div>
+          <div>
+            <form
+              className="config-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                act(async () => {
+                  const r = await send(
+                    "mcp/servers" + (server.id ? "/" + server.id : ""),
+                    server.id ? "PUT" : "POST",
+                    server,
+                  );
+                  setServer({ ...r.server, token: "" });
+                }, "服务器已保存");
+              }}
+            >
+              <h2>工具服务</h2>
+              <label>
+                名称
+                <input
+                  required
+                  value={server.name}
+                  onChange={(e) =>
+                    setServer({ ...server, name: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                服务地址
+                <input
+                  type="url"
+                  required
+                  value={server.base_url}
+                  onChange={(e) =>
+                    setServer({ ...server, base_url: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                令牌{server.has_token ? "（已配置，留空保留）" : ""}
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required={!server.has_token}
+                  value={server.token}
+                  onChange={(e) =>
+                    setServer({ ...server, token: e.target.value })
+                  }
+                />
+              </label>
+              <div className="form-actions">
+                <Button type="submit" busy={busy}>
+                  保存服务器
+                </Button>
+                {server.id && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        act(async () => {
+                          const r = await send(
+                            `mcp/servers/${server.id}/connect`,
+                            "POST",
+                          );
+                          setServer({ ...r.server, token: "" });
+                          setTools({ ...tools, [server.id]: r.tools });
+                        }, "连接成功，工具已发现")
+                      }
+                    >
+                      连接并发现
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        act(async () => {
+                          await send(
+                            `mcp/servers/${server.id}/disconnect`,
+                            "POST",
+                          );
+                          setServer({ ...server, connected: false });
+                          setTools({ ...tools, [server.id]: [] });
+                        }, "服务器已断开")
+                      }
+                    >
+                      断开
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "删除该服务器？已绑定的工具引用将不可用。",
+                          )
+                        )
+                          act(async () => {
+                            await send("mcp/servers/" + server.id, "DELETE");
+                            setServer({ name: "", base_url: "", token: "" });
+                          }, "服务器已删除");
+                      }}
+                    >
+                      删除
+                    </Button>
+                  </>
+                )}
+              </div>
+              {server.error && <p className="inline-error">{server.error}</p>}
+            </form>
+            {server.id && (
+              <div className="discovered-tools">
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    act(async () => {
+                      const r = await api(
+                        `/api/mcp/servers/${server.id}/tools`,
+                      );
+                      setTools({ ...tools, [server.id]: r.tools });
+                    }, "工具清单已更新")
+                  }
+                >
+                  查看工具清单
+                </Button>
+                {(tools[server.id] || []).map((t) => (
+                  <article key={t.name}>
+                    <h3>
+                      {t.name}@{server.name}
+                    </h3>
+                    <p>{t.description}</p>
+                    <details>
+                      <summary>输入参数</summary>
+                      <pre>{JSON.stringify(t.inputSchema, null, 2)}</pre>
+                    </details>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === "calls" && (
+        <div className="calls-list">
+          <Button
+            variant="outline"
+            onClick={() => act(reload, "调用记录已更新")}
+          >
+            刷新记录
+          </Button>
+          {!data.calls.length && <p>尚无工具调用记录。</p>}
+          {data.calls.map((c) => (
+            <article key={c.id}>
+              <div>
+                <strong>{c.tool_ref}</strong>
+                <span>
+                  {{ ok: "成功", denied: "被拒", error: "出错" }[c.status]}
+                </span>
+              </div>
+              <p>{c.detail}</p>
+              <small>
+                {c.display_name} · 会话 {c.conversation_id} · 第 {c.round} 轮 ·{" "}
+                {c.created_at}
+              </small>
+            </article>
+          ))}
         </div>
       )}
     </div>

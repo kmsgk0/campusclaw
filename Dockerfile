@@ -10,6 +10,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home campus
 COPY backend ./backend
+COPY mcp-server ./mcp-server
 COPY --from=frontend /static/dist ./static/dist
 RUN mkdir /app/data /app/uploads && chown -R campus:campus /app
 USER campus

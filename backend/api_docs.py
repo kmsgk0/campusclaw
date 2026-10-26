@@ -57,7 +57,21 @@ OPERATIONS = {
         {"question": {"type": "string", "minLength": 2, "maxLength": 500}},
         None,
     ),
-
+    "servers": ("教师查看本班工具服务", None, "servers"),
+    "save_server": (
+        "教师登记或修改工具服务",
+        {
+            "name": STRING,
+            "base_url": STRING,
+            "token": {"type": "string", "writeOnly": True},
+        },
+        "server",
+    ),
+    "delete_server": ("删除工具服务", None, "message"),
+    "connect_server": ("握手并发现工具", None, "server,tools"),
+    "disconnect_server": ("断开并清空发现列表", None, "message"),
+    "list_tools": ("工具说明与输入结构", None, "tools"),
+    "list_calls": ("最近 100 条本班工具调用", None, "calls"),
 }
 
 

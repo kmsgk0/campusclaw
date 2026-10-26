@@ -1,6 +1,6 @@
 # CampusClaw
 
-CampusClaw 提供按班级隔离的教学材料管理、知识检索、可配置智能体、技能、流式会话。当前功能、启动与配置见 [README.md](README.md)，功能合同见 `openspec/`。
+CampusClaw 提供按班级隔离的教学材料管理、知识检索、可配置智能体、技能、流式会话和 MCP 工具调用。当前功能、启动与配置见 [README.md](README.md)，功能合同见 `openspec/`。
 
 无规约不写代码。行为变更先修改活动 change，再实现并运行对应 verify。
 

@@ -1,90 +1,119 @@
 # CampusClaw
 
-为教师和学生提供按班级隔离的教学材料库。
-教师登录后上传材料，同班学生查看和下载，跨班访问被拒绝。
-支持关键词、向量与混合检索，以及带原文引用的简短问答。暂不支持注册和多副本部署。
+CampusClaw 为教师和学生提供按班级隔离的教学材料库与学习助手。教师上传材料、配置智能体和技能；学生阅读材料、检索知识，并通过原文引用核对回答。
 
-## 技术栈
-
-账号认证、班级隔离与材料管理的规约和实现位于同一仓库，认证采用 JWT Bearer token。后端采用 Flask、SQLite；前端采用 React、Radix Dialog/Tabs 与 Vite。界面是 sage/jade 配色的材料工作台，支持搜索、阅读、列表/网格、深浅色和上传弹窗。
+后端采用 Flask、SQLite/FTS5 和 Qdrant；前端采用 React、Vite 与 Radix Dialog/Tabs。嵌入和对话模型通过兼容 OpenAI 的接口接入，外部工具通过 MCP 调用。当前为单实例应用，支持 UTF-8 `.txt`、`.md` 文件，单文件上限 2 MiB；暂不支持注册、PDF/Word 解析和作业批改。
 
 ## 启动
 
-需要 Docker 与 Docker Compose。
+需要 Docker 与 Docker Compose。在项目根目录运行：
 
 ```bash
 cp .env.example .env
-# 设置 SEED_PASSWORD、JWT_SECRET，以及 .env.example 中的向量和对话服务配置
+# 填写账号初始密码、JWT 密钥、模型服务配置和 MCP 令牌
 docker compose up --build -d
 docker compose exec app flask --app backend.app:create_app index-materials
 ```
 
-浏览器访问 `http://localhost:8080`。预置账号为 `teacher_a`、`student_a1`、`student_b1`，初始密码均来自 `SEED_PASSWORD`。前两个账号属于 A 班，第三个属于 B 班。修改环境变量不会覆盖已有用户的密码哈希。
+访问 `http://localhost:8080`。Compose 启动应用、Qdrant 和 MCP 工具服务，数据库、上传文件和向量保存在命名 volume 中。普通重启使用 `docker compose down` 和 `up -d`；`down -v` 会删除数据。
 
-`GET /health` 无需登录，返回进程存活状态。数据库和文件保存在命名 volume 中，执行 `docker compose down` 后再启动仍保留数据。`down -v` 会删除数据，请勿用于普通重启。
+主要配置见 [.env.example](.env.example)：
 
-本项目采用单实例部署。预置账号用于功能演示，请设置独立测试密码与至少 32 字节的 `JWT_SECRET`。
+| 配置 | 用途 |
+| --- | --- |
+| `SEED_PASSWORD` | 预置账号初始密码，至少 12 个字符；修改配置不会覆盖已有密码 |
+| `JWT_SECRET` | JWT 签名密钥，至少 32 字节 |
+| `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIM` | 嵌入服务和向量维度 |
+| `CHAT_BASE_URL`、`CHAT_API_KEY`、`CHAT_MODEL` | 对话服务 |
+| `MCP_AUTH_TOKEN` | 本地 MCP 服务的 Bearer 令牌 |
+| `MCP_MAX_ROUNDS`、`MCP_MAX_CALLS` | 每次提问的工具轮次上限、每个会话的累计调用上限，默认 3 和 24 |
+| `BIND_ADDRESS`、`HOST_PORT` | 应用监听地址和端口，默认 `127.0.0.1:8080` |
 
-## 本地开发与检查
+模型 Base URL 写到接口前缀，通常为 `/v1`；后端追加 `/embeddings` 或 `/chat/completions`。密钥只由服务端使用，Qdrant 不发布宿主机端口。更换嵌入模型后需重建索引；更换维度还需处理对应 Qdrant collection。
 
-以下命令使用宿主机上的 Node.js 和 uv。上面的 Compose 配置用于构建和运行应用，其运行镜像不包含测试目录与开发依赖。
+预置账号为 `teacher_a`、`student_a1`（A 班）和 `teacher_b`、`student_b1`（B 班），初始密码均来自 `SEED_PASSWORD`。教师管理本班材料和配置，学生只读材料并使用本班助手。未登录返回 401，学生上传返回 403，跨班和不存在的对象统一返回 404。退出登录立即撤销令牌。
+
+如需示例材料和工具绑定，安装下方开发依赖后运行：
 
 ```bash
-npm --prefix web ci
-npm --prefix web run build
-uv sync
-uv run gunicorn --bind 127.0.0.1:8080 --workers 1 --threads 4 'backend.app:create_app()'
-uv run python -m pytest -q
+uv run python scripts/seed_demo.py
 ```
 
-页面入口为 `/login` 和 `/`。API：
+脚本通过 API 添加带“示例”标识的数学、语文材料，连接本地工具服务，并为尚未绑定材料的预置助手建立绑定，保留已有材料。
 
-| 方法和路径 | 用途 |
+## 使用
+
+材料工作台提供搜索、文件类型筛选、列表/网格、阅读和下载。上传或重建索引时可选择自动、自定义或 Markdown 标题分章切片，并查看原文位置。索引失败时保留材料，教师可重试。阅读区两侧可拖动调整宽度，也支持方向键调整和双击恢复；窄屏使用材料列表、阅读区切换和助手弹窗。支持浅色、深色主题。
+
+“知识检索”支持关键词、向量和混合检索。“知识问答”针对当前问题检索最多四条切片，生成带引用的回答；没有有效依据时显示“资料中未找到相关内容”，不调用回答模型。点击引用可查看高亮原文。成功的嵌入结果可按班级、文本、服务、模型和维度复用，重启不重新调用模型。
+
+“智能体对话”和阅读区助手使用持续会话。教师为智能体配置角色提示词、材料和技能；学生新建会话时选择助手。会话仅本人可见，刷新后可以恢复。每轮读取当前提示词和绑定，使用最近六条消息，每条最多 500 字。停用助手后不能新建对应会话，已有会话仍可继续。没有检索依据时仍可按角色回答，但不生成虚构引用；流式中断会明确标记。
+
+### 技能文件
+
+教师可以直接编写或导入 UTF-8 技能文件，例如：
+
+```text
+名称：数学解题引导
+适用条件：方程,去括号,分数,单位,换算
+资料：数学
+工具：knowledge_search,formula_hint@campus-tools
+启用：是
+
+先理解学生已做的步骤，再提示下一步应检查什么。不要给最终答案。
+```
+
+名称、适用条件和启用状态必填，空行后为技能说明。文件最多 8000 字，说明最多 2000 字。每轮只在当前助手绑定且启用的技能中按关键词选取一条，同分取编号较小者；名称含“解题引导”的技能只给引导。引用 MCP 工具前，需要先连接对应服务。
+
+### MCP 工具
+
+项目自带的 `mcp-tools` 地址为 `http://mcp-tools:8090`，提供公式提示 `formula_hint` 和单位换算关系 `unit_convert`。教师在“教学配置”中登记服务、连接并发现工具，再将 `工具名@服务器名` 写入技能。
+
+模型根据工具说明和输入结构决定调用，后端校验并执行后将结果交回模型。工具进度先于回答显示；失败不会阻断普通回答，断开服务会清空发现列表并拒绝后续调用。教师可查看本班最近 100 条调用记录。
+
+## 开发与检查
+
+使用 Node.js 和 uv，在项目根目录安装依赖：
+
+```bash
+uv sync
+npm --prefix web ci
+```
+
+启动 Compose 后运行 `npm --prefix web run dev`，访问 `http://127.0.0.1:5174`。Vite 将 `/api` 转发到端口 8080。更新端口 8080 的应用和生产页面时，运行 `docker compose up --build -d app`。
+
+```bash
+npm --prefix web run build
+uv run python -m pytest -q
+uv run python apitest/run_all.py
+npx --yes @fission-ai/openspec@1.14.3 validate --all --strict --no-interactive
+```
+
+`tests/` 检查后端行为。`apitest/` 按 URL 和 HTTP 方法组织检查，使用隔离数据库、内存 Qdrant、确定性模型夹具及真实 HTTP 应用/工具服务，核对响应和持久化结果；报告写入已忽略的 `apitest/reports/`。
+
+浏览器检查使用真实 Compose 服务和模型。准备示例材料后运行：
+
+```bash
+cd web
+npx playwright install chromium --only-shell
+npx playwright test
+```
+
+测试从本地 `.env` 读取预置密码，在测试账号中留下会话，截图写入已忽略的 `web/test-results/`。运行镜像不包含测试与开发依赖。
+
+## 项目结构与接口
+
+| 路径 | 职责 |
 | --- | --- |
-| `POST /api/login` | 校验账号密码，返回 Bearer token |
-| `GET /api/me` | 查询服务端确认的身份 |
-| `POST /api/logout` | 撤销会话 |
-| `GET /api/materials?q=关键词` | 搜索本班材料 |
-| `POST /api/materials` | 教师上传文件 |
-| `GET /api/materials/{id}` | 阅读本班材料 |
-| `GET /api/materials/{id}/file` | 下载本班原文件 |
+| `backend/` | Flask 应用、材料检索、智能体、工具接入与接口文档 |
+| `backend/schema.sql`、`backend/storage.py` | 统一建表定义和初始化入口 |
+| `backend/templates/`、`static/dist/` | Flask 页面模板与生成的前端资源 |
+| `web/src/` | 材料工作台、`Ask.jsx` 独立知识问答、`Chat.jsx` 持续会话和教师配置 |
+| `mcp-server/` | 独立 MCP 工具服务 |
+| `scripts/` | 示例数据准备 |
+| `tests/`、`apitest/`、`web/e2e/` | 后端、HTTP 接口与浏览器检查 |
+| `openspec/` | 现行功能规约和分阶段变更归档，入口见 [规约索引](openspec/README.md) |
 
-无有效登录返回 401，学生上传返回 403，跨班和不存在的材料统一返回 404。支持不超过 2 MiB 的 UTF-8 `.txt`、`.md`，不支持 PDF/Word。数据库保存文件元信息与正文，检索与模型问答见下文。
+运行后访问 `/swagger` 查看接口并试调，使用登录返回的 Bearer token 在 Authorize 中授权；机器可读定义位于 `/openapi.json`。Swagger 资源随前端构建提供，无需外部 CDN。`/health` 返回进程存活状态。
 
-登录返回 `token`、`token_type: Bearer` 和 `expires_in`。前端将 token 保存在当前标签页的 `sessionStorage`，后续 API 和文件下载请求携带 `Authorization: Bearer <token>`。服务端校验 JWT 签名与八小时有效期，再从数据库确认角色和班级；退出登录会撤销 token。页面刷新保留当前标签页的登录状态，关闭标签页后需重新登录。
-
-功能规约在 `openspec/`，覆盖认证、班级隔离、材料管理、知识检索与引用问答。
-
-验收重点是教师上传后本班可见、学生上传返回 403、跨班访问返回 404、登出后旧会话失效，以及 Compose 重启后数据保留。`tests/test_app.py` 检查 API 认证、权限和数据行为；Compose 重启持久化与浏览器操作需要在实际环境中核对。
-
-密钥、数据库、上传文件和构建缓存不进入 Git。
-
-## 知识检索与问答
-
-材料库中的「知识检索」提供关键词、语义和混合三种方式；「知识问答」先混合检索本班材料，再使用最多四条切片生成带编号引用的简短回答。点击「查看原文」可核对高亮片段。没有有效命中时显示「资料中未找到相关内容」，不调用回答模型。
-
-正文自动按最多 800 个 Unicode 字符切分，重叠 80 字并优先在自然边界断开。SQLite 保存原文、切片和中文二元词/英文词 FTS5 索引；Qdrant 保存向量。向量检索使用余弦相似度阈值 0.35，混合检索以 RRF（k=60）融合。字符范围左闭右开，切片编号从 0 开始。
-
-配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIM` 和 `CHAT_BASE_URL`、`CHAT_API_KEY`、`CHAT_MODEL`。Base URL 写到兼容接口前缀（通常为 `/v1`），应用分别追加 `/embeddings` 与 `/chat/completions`。模型密钥只由后端使用，Qdrant 不发布宿主机端口。
-
-上传先保存材料，再建立索引。失败时保留材料并明确显示索引状态，教师可点击「建立索引」重试；索引未就绪时查询会提示先完成索引。首次部署运行上面的补索引命令。重启不调用模型，相同班级中相同文本的成功向量结果会按服务、模型与维度复用，避免重复计算。更改向量模型时须重新索引；更改维度还需迁移对应 Qdrant collection，不能混用旧向量。
-
-| 方法和路径 | 用途 |
-| --- | --- |
-| `GET /api/search?q=内容&mode=hybrid&page=1` | 分页检索本班就绪切片，每页 20 条 |
-| `POST /api/ask` | JSON 中提交 `question`，返回 `answer` 和 `citations` |
-| `POST /api/materials/{id}/index` | 教师重新建立本班材料索引 |
-
-网关错误、额度不足和无效引用会明确报错，不自动重试或切换服务。回答输出预算为 512 token。服务日志仅记录接口返回的 token 用量，不记录问题、原文或密钥。`docker compose logs app` 可查看用量；未返回用量的接口不会被记作零消耗。
-
-## Workspace development
-
-Backend modules and the SQL schema are in `backend/`. Run `npm --prefix web run dev` for the Vite interface on port 5174, with Compose running on port 8080. The workspace provides light/dark themes, original-source dialogs and resizable reading columns.
-
-## Material processing
-
-Upload and index rebuild support automatic windows, custom length/overlap/separators and Markdown heading sections. Inspect original source ranges in the material index dialog. `/swagger` and `/openapi.json` document the available APIs.
-
-## Agents and conversations
-
-Teachers configure class-scoped agents, role prompts, UTF-8 skill files and material bindings in the management page. Students select an enabled agent and use private, persisted SSE conversations. Skill routing selects at most one enabled bound skill by trigger keywords. The reading assistant shares the conversation workflow. Inspect and exercise these APIs through `/swagger`.
+数据库、上传文件、密钥、依赖目录和构建/测试产物不进入 Git。

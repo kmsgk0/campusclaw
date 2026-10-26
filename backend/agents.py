@@ -3,32 +3,9 @@
 import json
 import re
 from flask import g, jsonify, request, Response, stream_with_context
-from werkzeug.exceptions import BadRequest, NotFound, Forbidden
+from werkzeug.exceptions import BadRequest, NotFound
 from .knowledge import ServiceError
-from functools import wraps
-
-
-def object_body():
-    data = request.get_json(silent=True)
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise BadRequest("请求正文须为 JSON 对象")
-    return data
-
-
-def teacher_only(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if g.user["role"] != "teacher":
-            raise Forbidden("仅教师可以管理")
-        return fn(*args, **kwargs)
-    return wrapper
-
-
-def check_refs(conn, class_id, refs):
-    if any(ref != "knowledge_search" for ref in refs):
-        raise ValueError("技能工具须为 knowledge_search")
+from .tools_api import teacher_only, check_refs, declarations, call_tool, object_body
 
 
 def parse_skill(text):
@@ -438,6 +415,8 @@ def register(app, db, login_required, knowledge):
         messages[-1]["content"] += "\n\n参考资料：\n" + (
             evidence or "本次未检索到绑定材料。"
         )
+        refs = json.loads(skill["tools_json"]) if skill else []
+        tools, mapping, unavailable = declarations(db(), user["class_id"], refs)
 
         @stream_with_context
         def generate():
@@ -454,6 +433,76 @@ def register(app, db, login_required, knowledge):
                 },
             )
             try:
+                for ref in unavailable:
+                    outcome = call_tool(db(), user, cid, 0, ref, {})
+                    outcomes.append(outcome)
+                    yield event("meta", {"tool_calls": list(outcomes)})
+                used = (
+                    db()
+                    .execute(
+                        "SELECT COUNT(*) FROM tool_calls WHERE conversation_id=?",
+                        (cid,),
+                    )
+                    .fetchone()[0]
+                )
+                for round_number in range(1, app.config["MCP_MAX_ROUNDS"] + 1):
+                    if not tools or used >= app.config["MCP_MAX_CALLS"]:
+                        break
+                    choice = knowledge.gateway.call(
+                        "chat",
+                        {
+                            "messages": messages,
+                            "tools": tools,
+                            "tool_choice": "auto",
+                            "stream": False,
+                            "max_tokens": 1500,
+                        },
+                    )
+                    model_message = choice["choices"][0]["message"]
+                    calls = model_message.get("tool_calls") or []
+                    if not calls:
+                        break
+                    messages.append(model_message)
+                    for call in calls:
+                        function = call.get("function", {})
+                        ref = mapping.get(function.get("name"))
+                        if not ref:
+                            outcome = {
+                                "ref": function.get("name", "unknown"),
+                                "status": "denied",
+                                "text": "工具不在本次授权范围",
+                            }
+                        elif used >= app.config["MCP_MAX_CALLS"]:
+                            outcome = {
+                                "ref": ref,
+                                "status": "denied",
+                                "text": "已达到会话工具调用次数上限",
+                            }
+                        else:
+                            try:
+                                arguments = json.loads(function.get("arguments", "{}"))
+                            except ValueError:
+                                arguments = None
+                            outcome = call_tool(
+                                db(), user, cid, round_number, ref, arguments
+                            )
+                            used += 1
+                        outcomes.append(outcome)
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": call["id"],
+                                "content": json.dumps(outcome, ensure_ascii=False),
+                            }
+                        )
+                    yield event("meta", {"tool_calls": list(outcomes)})
+                if tools:
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "工具阶段结束，请依据已有资料和工具结果作答。资料支持的步骤在句末标注对应的[n]编号。如工具失败请如实说明，不要声称已成功。",
+                        }
+                    )
                 for piece in knowledge.gateway.stream(messages):
                     pending += piece
                     # Keep a split citation marker until complete; never expose invented sources.

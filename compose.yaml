@@ -12,6 +12,8 @@ services:
       CHAT_BASE_URL: ${CHAT_BASE_URL:?Set CHAT_BASE_URL}
       CHAT_API_KEY: ${CHAT_API_KEY:?Set CHAT_API_KEY}
       CHAT_MODEL: ${CHAT_MODEL:?Set CHAT_MODEL}
+      MCP_MAX_ROUNDS: ${MCP_MAX_ROUNDS:-3}
+      MCP_MAX_CALLS: ${MCP_MAX_CALLS:-24}
       QDRANT_URL: http://qdrant:6333
     depends_on:
       - qdrant
@@ -22,6 +24,17 @@ services:
       - uploads:/app/uploads
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  mcp-tools:
+    build: .
+    restart: unless-stopped
+    command: ["gunicorn", "--chdir", "mcp-server", "--bind", "0.0.0.0:8090", "--workers", "1", "--threads", "2", "server:create_app()"]
+    environment:
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?Set MCP_AUTH_TOKEN}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
       interval: 10s
       timeout: 3s
       retries: 3

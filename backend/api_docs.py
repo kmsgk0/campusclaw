@@ -39,6 +39,24 @@ OPERATIONS = {
     "ask": ("有依据的单次问答", {"question": STRING}, "answer,citations"),
     "reindex": ("按策略重建材料索引", CHUNKS, "index_status,index_error"),
     "material_chunks": ("查看切片和原文位置", None, "chunks,index_status,options"),
+    "list_agents": ("本班智能体", None, "agents"),
+    "get_agent": ("智能体配置", None, "agent"),
+    "save_agent": ("教师保存智能体和绑定", AGENT, "agent"),
+    "list_skills": ("本班技能", None, "skills"),
+    "save_skill": ("教师保存技能文件", {"source_text": STRING}, "skill"),
+    "delete_skill": ("删除本班技能", None, "message"),
+    "conversations": ("我的会话", None, "conversations"),
+    "create_conversation": (
+        "选择智能体并新建会话",
+        {"agent_id": INTEGER},
+        "conversation",
+    ),
+    "get_conversation": ("会话与消息", None, "conversation,messages"),
+    "send_message": (
+        "提问并接收 SSE 回答",
+        {"question": {"type": "string", "minLength": 2, "maxLength": 500}},
+        None,
+    ),
 
 }
 

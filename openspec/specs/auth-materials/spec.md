@@ -17,7 +17,7 @@ The system MUST authenticate seeded users with hashed passwords and an expiring 
 #### Scenario: Invalid credentials and throttling
 - **WHEN** credentials are wrong or the user does not exist
 - **THEN** the response is the same 401 message and creates no session
-- **AND** ten failures from one address cause 429 for five minutes
+- **AND** five failures for one username and address temporarily block login for five minutes with the same 401 response
 
 #### Scenario: Missing session and logout
 - **WHEN** a protected API receives no Bearer token, a tampered token or an expired token
@@ -124,7 +124,9 @@ The system MUST provide persistent seed data, Docker Compose and public GET /hea
 
 #### Scenario: Seed and configuration
 - **WHEN** the application starts for the first time
-- **THEN** it creates A/B classes, teacher_a, student_a1, student_b1, distinguishable materials, and classes/users/materials/knowledge_entries/assignments/assistants/skills structures
+- **THEN** it creates A/B classes, teacher_a, teacher_b, student_a1, student_b1, distinguishable materials, and classes/users/materials/knowledge_entries/assignments/assistants/skills structures
+- **AND** a single SQL schema directly defines all tables, including class-scoped skills and material index options
+- **AND** repeated initialization preserves existing accounts, materials, skills and conversations
 - **AND** a missing or short seed password or JWT signing secret causes an explicit startup failure
 
 #### Scenario: Compose persistence

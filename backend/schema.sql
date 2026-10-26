@@ -42,3 +42,32 @@ CREATE TABLE IF NOT EXISTS embedding_cache (
  class_id INTEGER NOT NULL REFERENCES classes(id), fingerprint TEXT NOT NULL, vector_json TEXT NOT NULL,
  PRIMARY KEY(class_id,fingerprint)
 );
+
+CREATE TABLE IF NOT EXISTS tutor_agents (
+ id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), name TEXT NOT NULL,
+ prompt TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1, seed_key TEXT,
+ UNIQUE(class_id,name), UNIQUE(class_id,seed_key)
+);
+CREATE TABLE IF NOT EXISTS tutor_agent_skills (
+ agent_id INTEGER NOT NULL REFERENCES tutor_agents(id) ON DELETE CASCADE,
+ skill_id INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE, PRIMARY KEY(agent_id,skill_id)
+);
+CREATE TABLE IF NOT EXISTS tutor_agent_materials (
+ agent_id INTEGER NOT NULL REFERENCES tutor_agents(id) ON DELETE CASCADE,
+ material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE, PRIMARY KEY(agent_id,material_id)
+);
+CREATE TABLE IF NOT EXISTS conversations (
+ id INTEGER PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), user_id INTEGER NOT NULL REFERENCES users(id),
+ agent_id INTEGER NOT NULL REFERENCES tutor_agents(id), title TEXT NOT NULL DEFAULT '新的提问',
+ created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS messages (
+ id INTEGER PRIMARY KEY, conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+ role TEXT NOT NULL CHECK(role IN ('user','assistant')), content TEXT NOT NULL,
+ citations_json TEXT NOT NULL DEFAULT '[]', skill_name TEXT, tools_json TEXT NOT NULL DEFAULT '[]',
+ status TEXT NOT NULL DEFAULT 'complete', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS conversation_owner ON conversations(user_id,class_id,updated_at);
+CREATE INDEX IF NOT EXISTS message_conversation ON messages(conversation_id,id);
+CREATE INDEX IF NOT EXISTS knowledge_class ON knowledge_entries(class_id);

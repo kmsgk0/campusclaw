@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  CampusClaw provides class-isolated materials, retrieval and cited answers.
+  CampusClaw provides class-isolated materials, retrieval, configurable agents, skills and streamed conversations.
   Backend: Python, Flask, SQLite/FTS5 and Qdrant; external embedding/chat APIs.
   Frontend: React, Vite, Radix Dialog/Tabs, Lucide icons and Geist.
   Flask serves the frontend build; Docker Compose persists data, uploads and vectors.

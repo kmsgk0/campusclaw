@@ -35,6 +35,8 @@ import {
   ThemeToggle,
   cx,
 } from "./ui.jsx";
+import Chat from "./Chat.jsx";
+import Manage from "./Manage.jsx";
 import ChunkOptions, { defaultChunks } from "./ChunkOptions.jsx";
 import Ask from "./Ask.jsx";
 import SearchView from "./Search.jsx";
@@ -45,6 +47,8 @@ const sections = [
   { id: "materials", label: "材料库", icon: Library },
   { id: "search", label: "知识检索", icon: Search },
   { id: "ask", label: "知识问答", icon: MessageSquare },
+  { id: "chat", label: "智能体对话", icon: Sparkles },
+  { id: "manage", label: "教学配置", icon: LayoutGrid, teacherOnly: true },
 ];
 
 function useCompact() {
@@ -678,10 +682,7 @@ export default function Workspace({ dark, onToggleTheme }) {
                 </section>
                 {assistantOpen && !compact && (
                   <aside className="assistant-aside">
-                    <Ask
-                      messages={messages}
-                      setMessages={setMessages}
-                      readyCount={readyCount}
+                    <Chat
                       onSource={setSource}
                       onClose={() => setAssistantOpen(false)}
                     />
@@ -693,6 +694,12 @@ export default function Workspace({ dark, onToggleTheme }) {
           <div className="persistent-section" hidden={section !== "search"}>
             <SearchView onSource={setSource} onOpenMaterial={openMaterial} />
           </div>
+          {section === "chat" && (
+            <div className="chat-page">
+              <Chat onSource={setSource} full />
+            </div>
+          )}
+          {section === "manage" && teacher && <Manage />}
           {section === "ask" && (
             <div className="ask-page">
               <div className="section-heading">
@@ -706,7 +713,6 @@ export default function Workspace({ dark, onToggleTheme }) {
               </div>
               <div className="full-assistant-frame">
                 <Ask
-                  full
                   messages={messages}
                   setMessages={setMessages}
                   readyCount={readyCount}
@@ -726,7 +732,7 @@ export default function Workspace({ dark, onToggleTheme }) {
           side
           className="assistant-modal"
         >
-          <Ask messages={messages} setMessages={setMessages} readyCount={readyCount} onSource={setSource} />
+          <Chat onSource={setSource} />
         </Modal>
       )}
       <Modal

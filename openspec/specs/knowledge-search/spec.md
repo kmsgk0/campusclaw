@@ -71,8 +71,8 @@ The system MUST expose existing class-scoped retrieval, answers and protected or
 
 #### Scenario: Reader and question page
 - **WHEN** a user opens the reader-side assistant or the question page
-- **THEN** both present existing displayed exchanges and allow independent questions through POST /api/ask
-- **AND** only the current question is sent as question input to the API
+- **THEN** the question page provides grounded independent answers through POST /api/ask and the reader-side assistant provides persisted agent conversations
+- **AND** the grounded answer uses the current question and the agent conversation uses bounded saved history
 
 #### Scenario: Independent errors and sources
 - **WHEN** retrieval or answering fails

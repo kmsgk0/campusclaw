@@ -84,3 +84,7 @@ Backend modules and the SQL schema are in `backend/`. Run `npm --prefix web run 
 ## Material processing
 
 Upload and index rebuild support automatic windows, custom length/overlap/separators and Markdown heading sections. Inspect original source ranges in the material index dialog. `/swagger` and `/openapi.json` document the available APIs.
+
+## Agents and conversations
+
+Teachers configure class-scoped agents, role prompts, UTF-8 skill files and material bindings in the management page. Students select an enabled agent and use private, persisted SSE conversations. Skill routing selects at most one enabled bound skill by trigger keywords. The reading assistant shares the conversation workflow. Inspect and exercise these APIs through `/swagger`.

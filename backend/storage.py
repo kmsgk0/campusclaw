@@ -41,4 +41,43 @@ def initialize(conn, password, upload_dir):
                 (cur.lastrowid, class_id, body),
             )
 
+    for class_id in (1, 2):
+        for subject, trigger in [
+            ("数学", "方程,去括号,分数,通分,面积,应用题,未知数,行程,单位,换算"),
+            ("语文", "古诗,默写,阅读,作文,中心,词语"),
+        ]:
+            name = subject + "解题引导"
+            source = f"名称：{name}\n适用条件：{trigger}\n资料：{subject}\n工具：knowledge_search\n启用：是\n\n先理解学生已经做的步骤，指出下一步应检查什么。不要给最终答案、得数或完整解题过程。"
+            conn.execute(
+                "INSERT OR IGNORE INTO skills(class_id,name,trigger_text,description,subject_text,tools_json,source_text,seed_key) VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    class_id,
+                    name,
+                    trigger,
+                    source.split("\n\n", 1)[1],
+                    subject,
+                    json.dumps(["knowledge_search"]),
+                    source,
+                    subject,
+                ),
+            )
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO tutor_agents(class_id,name,prompt,seed_key) VALUES(?,?,?,?)",
+                (
+                    class_id,
+                    subject + "助手",
+                    "你是一位耐心的"
+                    + subject
+                    + "学习助手。请用清楚的中文帮助学生学习。",
+                    subject,
+                ),
+            )
+            if cur.rowcount:
+                sid = conn.execute(
+                    "SELECT id FROM skills WHERE class_id=? AND seed_key=?",
+                    (class_id, subject),
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO tutor_agent_skills VALUES(?,?)", (cur.lastrowid, sid)
+                )
     conn.commit()

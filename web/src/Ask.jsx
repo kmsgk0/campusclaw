@@ -5,7 +5,6 @@ import {
   ChevronRight,
   LoaderCircle,
   MessageSquare,
-  PanelRightClose,
   RotateCcw,
   ShieldCheck,
   Sparkles,
@@ -37,7 +36,7 @@ function AnswerText({ text, citations, onSource }) {
   );
 }
 
-export default function Ask({ messages, setMessages, readyCount, onSource, onClose, full = false }) {
+export default function Ask({ messages, setMessages, readyCount, onSource }) {
   const [question, setQuestion] = useState("");
   const end = useRef(null);
   const busy = messages.some((message) => message.status === "loading");
@@ -77,7 +76,7 @@ export default function Ask({ messages, setMessages, readyCount, onSource, onClo
     }
   }
   return (
-    <section className={full ? "assistant assistant-full" : "assistant"} aria-label="班级知识助手">
+    <section className="assistant assistant-full" aria-label="班级知识助手">
       <header className="assistant-header">
         <div>
           <span className="assistant-symbol">
@@ -96,7 +95,6 @@ export default function Ask({ messages, setMessages, readyCount, onSource, onClo
               <RotateCcw size={15} />
             </IconButton>
           )}
-          {onClose && <IconButton label="收起知识助手" onClick={onClose}><PanelRightClose size={17} /></IconButton>}
         </div>
       </header>
       <div className="assistant-context">
@@ -194,11 +192,11 @@ export default function Ask({ messages, setMessages, readyCount, onSource, onClo
       </div>
       <div className="composer-wrap">
         <form onSubmit={submit} className="composer">
-          <label className="sr-only" htmlFor={full ? "full-question" : "side-question"}>
+          <label className="sr-only" htmlFor="full-question">
             向本班材料提问
           </label>
           <textarea
-            id={full ? "full-question" : "side-question"}
+            id="full-question"
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="向本班材料提问…"
